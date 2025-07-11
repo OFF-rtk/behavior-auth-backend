@@ -1,5 +1,6 @@
-setuptools>=58.0.0
-wheel
+pip>=23.3
+setuptools>=65.0.0
+wheel>=0.40.0
 annotated-types==0.7.0
 anyio==4.9.0
 certifi==2025.6.15
@@ -13,7 +14,7 @@ geopy==2.4.1
 h11==0.16.0
 idna==3.10
 joblib==1.5.1
-numpy==1.24.4
+numpy==1.24.4 --only-binary=numpy
 pandas==2.3.0
 pydantic==2.11.7
 pydantic_core==2.33.2
