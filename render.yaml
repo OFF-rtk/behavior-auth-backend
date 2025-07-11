@@ -1,13 +1,11 @@
 services:
   - type: web
-    name: behavior-auth-backend
+    name: behavior-auth-api
     env: python
-    runtime: python
     branch: main
     buildCommand: "pip install -r requirements.txt"
     startCommand: "./startup.sh"
     plan: free
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11.9"
-
+        value: 3.11.9
