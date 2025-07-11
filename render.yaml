@@ -1,14 +1,12 @@
-name: behavior-auth-blueprint
-
 services:
   - type: web
     name: behavior-auth-api
     runtime: python
     repo: https://github.com/OFF-rtk/behavior-auth-backend
     branch: main
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: ./startup.sh
-    plan: free
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
