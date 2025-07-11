@@ -1,3 +1,5 @@
+name: behavior-auth-blueprint
+
 services:
   - type: web
     name: behavior-auth-api
