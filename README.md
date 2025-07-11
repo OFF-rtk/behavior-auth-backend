@@ -179,3 +179,9 @@ B.Tech Computer Science, BTKIT Dwarahat
 ## 📄 License
 
 MIT License — free to use with attribution
+
+---
+
+## 📄 API Documentation
+
+See [API_Documentation.pdf](./API_Documentation.pdf) for exact input schema, risk scoring method, and context analysis units.
