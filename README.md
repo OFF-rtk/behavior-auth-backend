@@ -174,6 +174,8 @@ curl -X POST https://behavior-auth-api.onrender.com/predict \
 B.Tech Computer Science, BTKIT Dwarahat  
 [GitHub – OFF-rtk](https://github.com/OFF-rtk)
 
+📄 [Privacy Policy](./PRIVACY_POLICY.md)
+
 ---
 
 ## 📄 License
