@@ -1,10 +1,11 @@
 services:
   - type: web
     name: behavior-auth-api
-    env: python
+    runtime: python
+    repo: OFF-rtk/behavior-auth-backend
     branch: main
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "./startup.sh"
+    buildCommand: pip install -r requirements.txt
+    startCommand: ./startup.sh
     plan: free
     envVars:
       - key: PYTHON_VERSION
