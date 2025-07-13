@@ -50,7 +50,7 @@ class ModelManager:
             return self.models[user_id]
         
         if os.path.exists(self._get_model_path(user_id)):
-            return self._load_model[user_id]
+            return self._load_model(user_id)
         
         raise ValueError("Model not trained yet")
     
@@ -84,8 +84,20 @@ class ModelManager:
 
         full_df = pd.concat(all_snapshots, ignore_index=True)
 
-        if len(full_df) < 10:
-            print(f"[{user_id}] ⚠️ Not enough total snapshots to train.")
+        try:
+            model, scaler, _ = self._get_model(user_id)
+            X_all = scaler.transform(full_df[FEATURES])
+            scores = model.decision_function(X_all)
+            low, high = np.percentile(scores, [5, 95])
+            mask = (scores >= low) & (scores <= high)
+            before, after = len(scores), mask.sum()
+            full_df = full_df.loc[mask].reset_index(drop=True)
+            print(f"[{user_id}] 🚧 Filtered out {before-after} anomalous snaps before retrain.")
+        except ValueError:
+            pass
+        
+        if full_df.shape[0] < 50:
+            print(f"[{user_id}] ⚠️ Not enough clean snapshots ({full_df.shape[0]}) to train.")
             return
 
         # Use only the latest 100 snapshots (or all if less)
@@ -94,10 +106,13 @@ class ModelManager:
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(train_df[FEATURES])
 
-        model = IsolationForest(n_estimators=100, contamination=0.1, random_state=42)
+        model = IsolationForest(n_estimators=100, contamination=0.05, random_state=42)
         model.fit(X_scaled)
 
-        iso_scores = model.decision_function(X_scaled)
+        raw_scores = model.decision_function(X_scaled)
+        low, high = np.percentile(raw_scores, [5, 95])
+        
+        iso_scores = raw_scores[(raw_scores >= low) & (raw_scores <= high)]
 
         # Save model to disk
         with open(self._get_model_path(user_id), "wb") as f:
@@ -163,9 +178,12 @@ class ModelManager:
             # Clip to range [-0.5, 0.5] and map to [100, 0] risk
             
             if iso_scores is not None and len(iso_scores) >= 10:
-                center = np.mean(iso_scores)
-                scale = np.std(iso_scores) if np.std(iso_scores) > 0 else 0.01
-                z_score = (iso_score - center) / scale
+                low, high = np.percentile(iso_scores, [5, 95])
+                clipped = np.clip(iso_score, low, high)
+                center = iso_score.mean()
+                scale = np.std(iso_score) if np.std(iso_score) > 0 else 0.01
+            
+                z_score = (clipped - center) / scale
                 norm_score = 1 / (1 + np.exp(-z_score * 1.5))  # sigmoid
             else:
                 # fallback sigmoid normalization for early snapshots
@@ -174,9 +192,11 @@ class ModelManager:
             # Convert to iso_risk (0 = safest, 70 = riskiest)
             iso_risk = round((1 - norm_score) * 100, 2)
 
+            mus = scaler.mean_
+            sigmas = np.where(scaler.scale_ > 0, scaler.scale_, 0.01)
+            z_feats = np.abs((X_scaled[0] * sigmas + mus - mus) / sigmas)
 
-
-            z_risk = np.mean(np.abs(zscore(X.iloc[0]))) * 10
+            z_risk = round(z_feats.mean() * 10, 2)
             final_risk = round(0.6 * iso_risk + 0.4 * z_risk, 2)
 
             print(f"[{user_id}] 📊 Isolation score: {iso_score}")

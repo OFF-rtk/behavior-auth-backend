@@ -9,6 +9,7 @@ from typing import List
 
 from app.model_manager import ModelManager
 from app.analyze_context import analyze_context
+from app.analyze_context import save_cached_context
 
 app = FastAPI()
 model_manager = ModelManager()
@@ -22,8 +23,6 @@ class DeviceInfo(BaseModel):
     device_model: str
 
 def flatten_snapshot(data: dict) -> dict:
-    print("\n📥 Raw snapshot received:")
-    print(json.dumps(data, indent=2))
     
     return {
         # tap data
@@ -118,6 +117,7 @@ def end_session(data: dict):
     #Flatten all snapshots
     flattened_snapshots = []
     context_scores_list = []
+    risks = []
 
     for snapshot in snapshots:
         # Flatten core features
@@ -129,14 +129,20 @@ def end_session(data: dict):
         context_scores = analyze_context(user_id, context_data)
         context_scores_list.append(context_scores)
         
+        risk = model_manager.predict_risk(user_id, flat)
+        risks.append(risk)
+        
     session_df = pd.DataFrame(flattened_snapshots)
     
-    # Calculate risk on averaged snapshot
-    averaged_snapshot = session_df.mean().to_dict()
-    risk = model_manager.predict_risk(user_id, averaged_snapshot)
+    
+    session_risk = round(sum(risks) / len(risks), 2) if risks else 0
 
+    if snapshots:
+        last_snapshot = snapshots[-1]
+        context = last_snapshot.get("context", {})
+        save_cached_context(user_id, context)
     # Determine where to save based on risk
-    if risk >= 55:
+    if session_risk >= 58:
         quarantine_dir = os.path.join("quarantine", user_id)
         os.makedirs(quarantine_dir, exist_ok=True)
         existing_quarantine = [
@@ -147,7 +153,7 @@ def end_session(data: dict):
         quarantine_path = os.path.join(quarantine_dir, f"session_{next_quarantine_number}.csv")
         session_df.to_csv(quarantine_path, index=False)
 
-        return {"message": f"⚠️ High-risk session quarantined. Risk = {risk:.2f}", "context_scores": context_scores_list}
+        return {"message": f"⚠️ High-risk session quarantined. Risk = {session_risk:.2f}", "context_scores": context_scores_list}
     
     user_dir = os.path.join("data", user_id)
     os.makedirs(user_dir, exist_ok=True)
@@ -157,7 +163,7 @@ def end_session(data: dict):
     session_path = os.path.join(user_dir, f"session_{next_session_number}.csv")
     session_df.to_csv(session_path, index=False)
     
-    if next_session_number >= 5:
+    if next_session_number >= 3:
         print(f"\n📚 Retraining on {min(len(existing) + 1, 15)} most recent sessions")
         model_manager._train_model(user_id)
     else:
@@ -165,7 +171,7 @@ def end_session(data: dict):
 
     return {
         "message": f"✅ Session {next_session_number} stored for {user_id}",
-        "risk_score": risk,
+        "risk_score": session_risk,
         "context_scores": context_scores_list
     }
 
